@@ -19,7 +19,8 @@ namespace map_manager{
 class MapManager{
 public:
     MapManager(ros::NodeHandle& nh):_nh(nh){}
-    void loadLocalMaps(const std::string& filename="");
+    void loadLocalMapsFromFile(const std::string& filename="");
+    void setInitialGuess(int id=0);
     void subscribeCallbacks(const std::string& pose_topic="");
 private:
     ros::NodeHandle _nh;
@@ -43,10 +44,13 @@ private:
     typedef std::map<srrg_core_map_2::BaseMapNode*,srrg_core_map_2::MapNodePtrSet> MapNodePtrMapNodePtrSetMap;
     MapNodePtrMapNodePtrSetMap _neighbors_map;
 
+    void getTraversabilityFromLocalMap();
+
     void poseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr& msg);
 
     bool isTraversable(srrg_core_map_2::LocalMap3D* current_map,Eigen::Vector3f p);
 
+    bool mapCallback(nav_msgs::GetMap::Request &req, nav_msgs::GetMap::Response &res);
 };
 
 }

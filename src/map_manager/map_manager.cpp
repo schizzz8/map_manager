@@ -4,10 +4,11 @@ namespace map_manager {
 
 using namespace std;
 using namespace srrg_boss;
+using namespace srrg_core;
 using namespace srrg_core_map_2;
 using namespace srrg_core_ros;
 
-void MapManager::loadLocalMaps(const string &filename){
+void MapManager::loadLocalMapsFromFile(const string &filename){
 
     Serializable* o;
 
@@ -57,11 +58,63 @@ void MapManager::loadLocalMaps(const string &filename){
         }
 }
 
+void MapManager::setInitialGuess(int id){
+
+    for(MapNodePtrSet::iterator it=_nodes.begin();it!=_nodes.end();++it){
+        LocalMap3D* lmap = dynamic_cast<LocalMap3D*> (*it);
+
+        if(lmap && lmap->getId() == id){
+            _current_map = lmap;
+            _current_map_transform = lmap->estimate();
+            getTraversabilityFromLocalMap();
+            break;
+        }
+    }
+}
+
 void MapManager::subscribeCallbacks(const string &pose_topic){
+
+    _service = _nh.advertiseService("static_map", &MapManager::mapCallback, this);
+    _metadata_pub= _nh.advertise<nav_msgs::MapMetaData>("map_metadata", 1, true);
+    _map_pub = _nh.advertise<nav_msgs::OccupancyGrid>("map", 1, true);
+
     _pose_sub = _nh.subscribe(pose_topic,10,&MapManager::poseCallback,this);
+
+}
+
+void MapManager::getTraversabilityFromLocalMap(){
+
+    TraversabilityMap* traversability = _current_map->traversabilityMap();
+    _map_resp.map.info.width = traversability->dimensions().x();
+    _map_resp.map.info.height = traversability->dimensions().y();
+    _map_resp.map.info.resolution = traversability->resolution();
+    _map_resp.map.info.origin.position.x = traversability->origin().x();
+    _map_resp.map.info.origin.position.y = traversability->origin().x();
+    _map_resp.map.info.origin.position.z = traversability->origin().z();
+    Eigen::Quaternionf q = Eigen::Quaternionf::Identity();
+    _map_resp.map.info.origin.orientation.x = q.x();
+    _map_resp.map.info.origin.orientation.y = q.y();
+    _map_resp.map.info.origin.orientation.z = q.z();
+    _map_resp.map.info.origin.orientation.w = q.w();
+
+    cv::Mat image = traversability->image()->image();
+    _map_resp.map.data.resize(_map_resp.map.info.width * _map_resp.map.info.height);
+    for(int c=0; c<image.cols; c++)
+        for(int r=0; r<image.rows; r++)
+            _map_resp.map.data[r+image.rows*c]=image.at<unsigned char>(r,c);
+
+    _map_resp.map.info.map_load_time = ros::Time::now();
+    _map_resp.map.header.frame_id = "map";
+    _map_resp.map.header.stamp = ros::Time::now();
+    _map_pub.publish(_map_resp.map);
+
+    _metadata_message = _map_resp.map.info;
+    _metadata_pub.publish(_metadata_message);
+
 }
 
 void MapManager::poseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg){
+
     _robot_pose=pose2eigen(msg.get()->pose.pose);
 
     if(! isTraversable(_current_map,_robot_pose.translation())){
@@ -71,6 +124,7 @@ void MapManager::poseCallback(const geometry_msgs::PoseWithCovarianceStampedCons
             if(isTraversable(neighbor,(neighbor->estimate().inverse()*_current_map_transform*_robot_pose).translation())){
                 _current_map = neighbor;
                 _current_map_transform = _current_map->estimate();
+                getTraversabilityFromLocalMap();
                 break;
             }
         }
@@ -79,14 +133,15 @@ void MapManager::poseCallback(const geometry_msgs::PoseWithCovarianceStampedCons
 }
 
 bool MapManager::isTraversable(LocalMap3D *current_map, Eigen::Vector3f p){
-    srrg_core::TraversabilityMap* traversability = current_map->traversabilityMap();
+
+    TraversabilityMap* traversability = current_map->traversabilityMap();
 
     if(!traversability)
         return false;
 
     float resolution = traversability->resolution();
     const Eigen::Vector3f& origin = traversability->origin();
-    srrg_core::ImageData* image = traversability->image();
+    ImageData* image = traversability->image();
 
     Eigen::Vector3f projected = (p - origin)/resolution;
     int r=projected.y();
@@ -99,4 +154,13 @@ bool MapManager::isTraversable(LocalMap3D *current_map, Eigen::Vector3f p){
         return false;
     return true;
 }
+
+bool MapManager::mapCallback(nav_msgs::GetMap::Request &req, nav_msgs::GetMap::Response &res){
+
+    res = _map_resp;
+    ROS_INFO("sending map!");
+
+    return true;
+}
+
 }
