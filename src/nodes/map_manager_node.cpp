@@ -21,8 +21,8 @@ void startManager(MapManager* manager, ros::NodeHandle& private_nh){
     cerr << "[int] _initial_guess: " << initial_guess << endl;
 
     manager->loadLocalMapsFromFile(filename);
-    manager->setInitialGuess(initial_guess);
     manager->subscribeCallbacks(pose_topic);
+    manager->setInitialGuess(initial_guess);
 }
 
 int main (int argc, char* argv[]){

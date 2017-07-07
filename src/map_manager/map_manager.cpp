@@ -8,8 +8,6 @@ using namespace srrg_core;
 using namespace srrg_core_map_2;
 using namespace srrg_core_ros;
 
-// compute linear index for given map coords
-#define MAP_IDX(sx, i, j) ((sx) * (j) + (i))
 
 void MapManager::loadLocalMapsFromFile(const string &filename){
 
@@ -90,13 +88,9 @@ void MapManager::subscribeCallbacks(const string &pose_topic){
 void MapManager::getTraversabilityFromLocalMap(){
 
     TraversabilityMap* traversability = _current_map->traversabilityMap();
-    cerr << "Map metadata: " << endl;
-    cerr << "dimensions: " << traversability->dimensions().transpose() << endl;
     _map_resp.map.info.width = traversability->dimensions().x();
     _map_resp.map.info.height = traversability->dimensions().y();
-    cerr << "resolution: " << traversability->resolution() << endl;
     _map_resp.map.info.resolution = traversability->resolution();
-    cerr << "origin: " << traversability->origin().transpose() << endl;
     _map_resp.map.info.origin.position.x = traversability->origin().x();
     _map_resp.map.info.origin.position.y = traversability->origin().x();
     _map_resp.map.info.origin.position.z = 0;
@@ -108,34 +102,26 @@ void MapManager::getTraversabilityFromLocalMap(){
 
     UnsignedCharImage image = traversability->image()->image();
     _map_resp.map.data.resize(_map_resp.map.info.width * _map_resp.map.info.height);
+    int k = 0;
+    for(int r=0; r<image.rows; ++r)
+        for(int c=0; c<image.cols; ++c, ++k){
+            int value = (int)image.at<unsigned char>(r,c);
+            if(value==127)
+                _map_resp.map.data[k] = -1;
+            if(value==0)
+                _map_resp.map.data[k] = 100;
+            if(value==255)
+                _map_resp.map.data[k] = 0;
+        }
 
-//    for(int c=0; c<image.cols; c++)
-//        for(int r=0; r<image.rows; r++)
-//            _map_resp.map.data[r + c*(image.rows)] = image.at<unsigned char>(r,c);
-
+    _map_resp.map.info.map_load_time = ros::Time::now();
+    _map_resp.map.header.frame_id = "map";
+    _map_resp.map.header.stamp = ros::Time::now();
+    _map_pub.publish(_map_resp.map);
+    _metadata_message = _map_resp.map.info;
+    _metadata_pub.publish(_metadata_message);
     ROS_INFO("Publishing map!");
 
-//    for(int i=0;i<_map_resp.map.data.size();i++)
-//        cerr << (int)_map_resp.map.data[i] << " ";
-
-//    _map_resp.map.info.map_load_time = ros::Time::now();
-//    _map_resp.map.header.frame_id = "map";
-//    _map_resp.map.header.stamp = ros::Time::now();
-//    _map_pub.publish(_map_resp.map);
-
-//    _metadata_message = _map_resp.map.info;
-//    _metadata_pub.publish(_metadata_message);
-
-    nav_msgs::OccupancyGrid map;
-    map.header.frame_id = "map";
-    map.header.stamp = ros::Time::now();
-
-    map.info.map_load_time = ros::Time::now();
-    map.info.resolution = traversability->resolution();
-    map.info.width = image.cols;
-    map.info.height = image.rows;
-
-    _map_pub.publish(map);
 }
 
 void MapManager::poseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg){
@@ -183,6 +169,7 @@ bool MapManager::isTraversable(LocalMap3D *current_map, Eigen::Vector3f p){
 bool MapManager::mapCallback(nav_msgs::GetMap::Request &req, nav_msgs::GetMap::Response &res){
 
     res = _map_resp;
+    //_map_pub.publish(_map_resp.map);
     ROS_INFO("sending map!");
 
     return true;
