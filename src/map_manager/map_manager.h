@@ -14,6 +14,8 @@
 
 #include "srrg_ros_wrappers/ros_utils.h"
 
+
+
 namespace map_manager{
 
 class MapManager{
