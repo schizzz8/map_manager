@@ -38,7 +38,7 @@ private:
 
     srrg_core_map_2::LocalMap3D* _current_map;
     srrg_core_map_2::MapNodePtrSet _nodes;
-    srrg_core_map_2::BinaryMapNodeRelationPtrSet _relations;
+    srrg_core_map_2::BinaryNodeRelationPtrSet _relations;
 
     Eigen::Isometry3f _current_map_transform;
     Eigen::Isometry3f _robot_pose;

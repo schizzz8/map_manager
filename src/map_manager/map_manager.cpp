@@ -23,7 +23,7 @@ void MapManager::loadLocalMapsFromFile(const string &filename){
         if(lmap)
             _nodes.insert(lmap);
 
-        Pose3DPose3DMapNodeRelation* rel = dynamic_cast<Pose3DPose3DMapNodeRelation*> (o);
+        Pose3DBinaryNodeRelation* rel = dynamic_cast<Pose3DBinaryNodeRelation*> (o);
         if(rel){
             LocalMap3D* from = dynamic_cast<LocalMap3D*> (rel->from());
             LocalMap3D* to = dynamic_cast<LocalMap3D*> (rel->to());
@@ -44,7 +44,7 @@ void MapManager::loadLocalMapsFromFile(const string &filename){
             if(id1==id2)
                 continue;
 
-            for(BinaryMapNodeRelationPtrSet::iterator kt=_relations.begin();kt!=_relations.end();++kt)
+            for(BinaryNodeRelationPtrSet::iterator kt=_relations.begin();kt!=_relations.end();++kt)
                 if((*kt)->from()->getId() == id1 && (*kt)->to()->getId() == id2 ||
                         (*kt)->from()->getId() == id2 && (*kt)->to()->getId() == id1){
                     MapNodePtrMapNodePtrSetMap::iterator lt = _neighbors_map.find(*it);
